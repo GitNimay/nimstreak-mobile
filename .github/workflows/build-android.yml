@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    defaults:
+      run:
+        working-directory: ./nimstreak
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -20,6 +23,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: ./nimstreak/package-lock.json
 
       - name: Install dependencies
         run: npm ci
