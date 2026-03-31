@@ -44,6 +44,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e8aa28d4-fb4e-472f-ab4f-0001eb6e5092"
+      }
+    },
+    "owner": "nimstreak"
   }
 }
