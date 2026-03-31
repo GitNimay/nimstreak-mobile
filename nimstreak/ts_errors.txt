@@ -1,0 +1,4 @@
+﻿lib/theme.ts(74,28): error TS1005: '>' expected.
+lib/theme.ts(74,33): error TS1005: ')' expected.
+lib/theme.ts(76,6): error TS1161: Unterminated regular expression literal.
+lib/theme.ts(77,3): error TS1128: Declaration or statement expected.
