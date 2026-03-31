@@ -1,8 +1,9 @@
-name: Build Android APK
+name: Build & Release APK
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -41,6 +42,11 @@ jobs:
           DOWNLOAD_URL=$(echo "$BUILD_INFO" | jq -r '.[0].artifacts.buildUrl')
           echo "Downloading from: $DOWNLOAD_URL"
           curl -L -o nimstreak.apk "$DOWNLOAD_URL"
+
+      - name: Create GitHub Release
+        run: gh release create ${{ github.ref_name }} --generate-notes --title "Release ${{ github.ref_name }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload APK to Release
         run: gh release upload ${{ github.ref_name }} nimstreak.apk --clobber
