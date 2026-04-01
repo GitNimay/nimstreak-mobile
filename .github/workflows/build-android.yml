@@ -53,6 +53,9 @@ jobs:
           name: android-project
           path: ./nimstreak/android
 
+      - name: Restore gradlew permissions
+        run: chmod +x android/gradlew
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
