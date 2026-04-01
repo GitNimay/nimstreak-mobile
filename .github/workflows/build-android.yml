@@ -6,11 +6,9 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    name: Build Android APK
+  prepare:
+    name: Prepare Android Project
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: ./nimstreak
@@ -28,6 +26,33 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Upload Android project
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-project
+          path: nimstreak/android/
+          retention-days: 1
+
+  build:
+    name: Build Signed APK
+    needs: prepare
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./nimstreak
+    steps:
+      - name: Download Android project
+        uses: actions/download-artifact@v4
+        with:
+          name: android-project
+          path: ./nimstreak/android
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -43,12 +68,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Generate Android project
-        run: npx expo prebuild --platform android --clean
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
       - name: Decode keystore
         run: echo "$KEYSTORE_BASE64" | base64 -d > android/app/release-key.jks
@@ -67,9 +86,7 @@ jobs:
       - name: Patch build.gradle for signing
         run: |
           BUILD_GRADLE="android/app/build.gradle"
-          # Add signingConfigs block before android block closing
           sed -i '/^android {/a\    signingConfigs {\n        release {\n            def propsFile = file("keystore.properties")\n            if (propsFile.exists()) {\n                def props = new Properties()\n                props.load(new FileInputStream(propsFile))\n                storeFile file(props["storeFile"])\n                storePassword props["storePassword"]\n                keyAlias props["keyAlias"]\n                keyPassword props["keyPassword"]\n            }\n        }\n    }' "$BUILD_GRADLE"
-          # Add signingConfig to release build type
           sed -i '/buildTypes {/,/}/{s/release {/release {\n                signingConfig signingConfigs.release/}' "$BUILD_GRADLE"
 
       - name: Build APK
@@ -83,14 +100,36 @@ jobs:
           APP_VERSION=$(node -p "require('./package.json').version")
           mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/nimstreak-v${APP_VERSION}.apk
 
-      - name: Create GitHub Release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nimstreak-apk
+          path: nimstreak/android/app/build/outputs/apk/release/nimstreak-v*.apk
+          retention-days: 5
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: nimstreak-apk
+          path: ./release
+
+      - name: Find APK
+        id: find_apk
+        run: echo "apk_path=$(ls ./release/nimstreak-v*.apk)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
         run: gh release create ${{ github.ref_name }} --generate-notes --title "NIMSTREAK Release ${{ github.ref_name }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload APK to Release
-        run: |
-          APP_VERSION=$(node -p "require('./package.json').version")
-          gh release upload ${{ github.ref_name }} android/app/build/outputs/apk/release/nimstreak-v${APP_VERSION}.apk --clobber
+      - name: Upload APK
+        run: gh release upload ${{ github.ref_name }} "${{ steps.find_apk.outputs.apk_path }}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
