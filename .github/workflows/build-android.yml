@@ -56,6 +56,16 @@ jobs:
       - name: Restore gradlew permissions
         run: chmod +x android/gradlew
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ./nimstreak/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
